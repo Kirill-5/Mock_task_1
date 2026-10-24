@@ -1,6 +1,7 @@
 import uuid
 from types import TracebackType
 from typing import Protocol, Self
+from collections.abc import Callable
 
 from app.domain.entities import Project, Task, TaskPriority, TaskStatus
 
@@ -61,3 +62,5 @@ class UnitOfWork(Protocol):
     async def commit(self) -> None: ...
 
     async def rollback(self) -> None: ...
+
+UowFactory = Callable[[], UnitOfWork]
