@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 
-from app.domain.entities import TaskPriority, TaskStatus , Task
+from app.domain.entities import TaskPriority, TaskStatus, Task
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,3 @@ class UpdateTask:
 class ChangeTaskStatus:
     task_id: uuid.UUID
     status: TaskStatus
-
-
-
-

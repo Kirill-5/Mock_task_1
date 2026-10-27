@@ -20,7 +20,6 @@ from app.domain.errors import (
 )
 
 
-
 class CreateProjectUseCase:
     def __init__(self, uow_factory: UowFactory) -> None:
         self._uow_factory = uow_factory
@@ -124,7 +123,9 @@ class UpdateTaskUseCase:
             task.update(command.title, command.priority)
 
             title_changed = task.title.casefold() != old_title.casefold()
-            if title_changed and await uow.tasks.exists_by_title(task.project_id, task.title):
+            if title_changed and await uow.tasks.exists_by_title(
+                task.project_id, task.title
+            ):
                 raise TaskTitleAlreadyExists(
                     f"task with title '{task.title}' already exists in project {task.project_id}"
                 )
@@ -176,4 +177,6 @@ class ListProjectTasksUseCase:
                 priority=query.priority,
             )
 
-        return TaskPage(items=items, total=total, limit=query.limit, offset=query.offset)
+        return TaskPage(
+            items=items, total=total, limit=query.limit, offset=query.offset
+        )

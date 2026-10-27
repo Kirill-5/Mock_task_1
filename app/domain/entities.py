@@ -3,7 +3,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 
-from app.domain.errors import DomainValidationError, InvalidStatusTransition, TaskAlreadyDone
+from app.domain.errors import (
+    DomainValidationError,
+    InvalidStatusTransition,
+    TaskAlreadyDone,
+)
 
 MAX_PROJECT_NAME_LENGTH = 100
 MIN_PROJECT_NAME_LENGTH = 3
@@ -50,7 +54,6 @@ def _validate_priority(priority: TaskPriority | str) -> TaskPriority:
         ) from None
 
 
-
 @dataclass(frozen=True)
 class Project:
     id: uuid.UUID
@@ -69,7 +72,10 @@ class Project:
                 f"and {MAX_PROJECT_NAME_LENGTH} characters"
             )
 
-        if description is not None and len(description) > MAX_PROJECT_DESCRIPTION_LENGTH:
+        if (
+            description is not None
+            and len(description) > MAX_PROJECT_DESCRIPTION_LENGTH
+        ):
             raise DomainValidationError(
                 f"description must not exceed {MAX_PROJECT_DESCRIPTION_LENGTH} characters"
             )
@@ -94,12 +100,11 @@ class Task:
 
     @classmethod
     def new(
-            cls,
-            project_id: uuid.UUID,
-            title: str,
-            priority: TaskPriority = TaskPriority.MEDIUM,
+        cls,
+        project_id: uuid.UUID,
+        title: str,
+        priority: TaskPriority = TaskPriority.MEDIUM,
     ) -> "Task":
-
         title = _normalize_title(title)
         priority = _validate_priority(priority)
         current_time = datetime.now(timezone.utc)
@@ -125,14 +130,12 @@ class Task:
         self.status = new_status
         self.updated_at = datetime.now(timezone.utc)
 
-
     def update(
         self,
         new_title: str | None = None,
         new_priority: TaskPriority | None = None,
     ) -> None:
         if self.status == TaskStatus.DONE:
-
             raise TaskAlreadyDone(f"task {self.id} is done and cannot be changed")
 
         if new_title is not None:

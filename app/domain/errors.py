@@ -2,10 +2,8 @@ class DomainError(Exception):
     """Базовая ошибка предметной области."""
 
 
-
 class DomainValidationError(DomainError):
     """Данные не прошли проверку: длина, формат, допустимые значения (422)."""
-
 
 
 class NotFoundError(DomainError):
