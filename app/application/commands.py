@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 
-from app.domain.entities import TaskPriority, TaskStatus, Task
+from app.domain.entities import Task, TaskPriority, TaskStatus
 
 
 @dataclass(frozen=True)

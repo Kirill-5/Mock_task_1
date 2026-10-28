@@ -1,7 +1,7 @@
 import uuid
+from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol, Self
-from collections.abc import Callable
 
 from app.domain.entities import Project, Task, TaskPriority, TaskStatus
 

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from app.domain.errors import (
@@ -84,7 +84,7 @@ class Project:
             id=uuid.uuid4(),
             name=name,
             description=description,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
 
@@ -107,7 +107,7 @@ class Task:
     ) -> "Task":
         title = _normalize_title(title)
         priority = _validate_priority(priority)
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
 
         return cls(
             id=uuid.uuid4(),
@@ -128,7 +128,7 @@ class Task:
             )
 
         self.status = new_status
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update(
         self,
@@ -149,4 +149,4 @@ class Task:
         if new_priority is not None:
             self.priority = new_priority
 
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
