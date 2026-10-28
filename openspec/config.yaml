@@ -1,0 +1,47 @@
+schema: spec-driven
+
+context: |
+  Language: ru
+  All artifacts must be written in ru.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Полный источник правил проекта — CLAUDE.md (домен, API, команды). Здесь только выжимка.
+
+  Проект: REST API для проектов и задач.
+  Стек: Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Alembic, Pydantic v2, pytest, ruff, Docker Compose.
+
+  Clean Architecture, зависимости направлены только внутрь:
+    presentation → application → domain; infrastructure → application → domain.
+  - domain: сущности (dataclass), бизнес-правила, доменные ошибки; без импортов других слоёв и сторонних библиотек.
+  - application: порты на Protocol (репозитории, UnitOfWork), команды/результаты (frozen dataclass), use cases.
+  - infrastructure: ORM-модели (from_domain/to_domain), репозитории, SqlAlchemyUnitOfWork.
+  - presentation: схемы Pydantic, зависимости FastAPI, роутеры.
+
+  Ключевые соглашения:
+  - Сущности создаются через Entity.new(...), состояние меняется только методами сущности.
+  - Репозитории делают flush(), но никогда commit(); коммит — только явно в use case, UoW откатывает незакоммиченное.
+  - Use case бросает только доменные ошибки и не знает про HTTP.
+  - Маппинг ошибок: NotFoundError → 404, ConflictError → 409, DomainValidationError → 422.
+  - Уникальность: проверка в use case + уникальный индекс в БД.
+
+rules:
+  proposal:
+    - Всегда явно указывать, что вне scope изменения
+  specs:
+    - Каждое требование сопровождается минимум одним Scenario в формате WHEN/THEN
+    - Scenarios покрывают не только успешный путь, но и ошибки с HTTP-кодами ответа (404, 409, 422)
+  tasks:
+    - На каждый Scenario из specs должна быть задача на тест, который его проверяет
+    - "Последняя группа задач всегда — проверка: ruff check ., ruff format --check ., pytest зелёный, alembic upgrade head на чистой БД"
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
