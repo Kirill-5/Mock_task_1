@@ -6,8 +6,9 @@ REST API для управления проектами и их задачами
 Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Alembic, Pydantic v2, pytest, Docker Compose.
 
 ## Команды
+- Поднять PostgreSQL (рабочая `app` и тестовая `app_test` базы): `docker compose up -d db`
 - Запуск API: `uvicorn app.main:app --reload`
-- Тесты: `pytest`
+- Тесты: `pytest` (нужна запущенная БД: `docker compose up -d db`)
 - Линтер и форматирование: `ruff check .` / `ruff format .`
 - Применить миграции: `alembic upgrade head`
 - Новая миграция: `alembic revision --autogenerate -m "<описание>"`
