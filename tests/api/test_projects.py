@@ -70,6 +70,7 @@ async def test_create_project_strips_whitespace(client: AsyncClient) -> None:
         pytest.param(
             {"name": "Alpha", "description": "d" * 1001}, id="long-description"
         ),
+        pytest.param({"name": "Alpha", "owner": "bob"}, id="unknown-field"),
     ],
 )
 async def test_create_project_rejects_invalid_data(
