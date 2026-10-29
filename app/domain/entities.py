@@ -138,6 +138,9 @@ class Task:
         if self.status == TaskStatus.DONE:
             raise TaskAlreadyDone(f"task {self.id} is done and cannot be changed")
 
+        if new_title is None and new_priority is None:
+            raise DomainValidationError("title or priority must be provided")
+
         if new_title is not None:
             new_title = _normalize_title(new_title)
 

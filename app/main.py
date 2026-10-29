@@ -8,7 +8,7 @@ from app.domain.errors import ConflictError, DomainValidationError, NotFoundErro
 from app.infrastructure.db.session import create_engine, create_session_factory
 from app.infrastructure.settings import Settings
 from app.infrastructure.uow import SqlAlchemyUnitOfWork
-from app.presentation.routers import projects
+from app.presentation.routers import projects, tasks
 
 ERROR_STATUS_CODES: dict[type[Exception], int] = {
     NotFoundError: status.HTTP_404_NOT_FOUND,
@@ -39,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Projects and tasks", lifespan=lifespan)
     app.include_router(projects.router)
+    app.include_router(tasks.router)
 
     for error_class, status_code in ERROR_STATUS_CODES.items():
         app.add_exception_handler(error_class, _error_handler(status_code))
