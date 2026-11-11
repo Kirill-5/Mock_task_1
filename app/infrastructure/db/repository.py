@@ -1,10 +1,10 @@
 import uuid
 
-from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy import ColumnElement, delete, exists, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.entities import Project, Task, TaskStatus
+from app.domain.entities import Project, Task, TaskPriority, TaskStatus
 from app.domain.errors import ProjectNameAlreadyExists, TaskTitleAlreadyExists
 from app.infrastructure.db.models import (
     PROJECT_NAME_UNIQUE_INDEX,
@@ -23,6 +23,19 @@ def _raise_if_title_taken(error: IntegrityError, task: Task) -> None:
         raise TaskTitleAlreadyExists(
             f"task with title '{task.title}' already exists in project {task.project_id}"
         ) from error
+
+
+def _project_tasks_conditions(
+    project_id: uuid.UUID,
+    status: TaskStatus | None,
+    priority: TaskPriority | None,
+) -> list[ColumnElement[bool]]:
+    conditions = [TaskModel.project_id == project_id]
+    if status is not None:
+        conditions.append(TaskModel.status == status.value)
+    if priority is not None:
+        conditions.append(TaskModel.priority == priority.value)
+    return conditions
 
 
 class SqlAlchemyProjectRepository:
@@ -99,6 +112,39 @@ class SqlAlchemyTaskRepository:
             )
         )
         return bool(await self._session.scalar(query))
+
+    async def list_by_project(
+        self,
+        project_id: uuid.UUID,
+        *,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[Task]:
+        query = (
+            select(TaskModel)
+            .where(*_project_tasks_conditions(project_id, status, priority))
+            .order_by(TaskModel.created_at.desc(), TaskModel.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        models = await self._session.scalars(query)
+        return [model.to_domain() for model in models]
+
+    async def count_by_project(
+        self,
+        project_id: uuid.UUID,
+        *,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(TaskModel)
+            .where(*_project_tasks_conditions(project_id, status, priority))
+        )
+        return await self._session.scalar(query) or 0
 
     async def has_tasks_in_progress(self, project_id: uuid.UUID) -> bool:
         query = select(
