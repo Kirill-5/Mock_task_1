@@ -52,3 +52,12 @@ class TaskRead(BaseModel):
     status: TaskStatus
     created_at: datetime
     updated_at: datetime
+
+
+class TaskPageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: list[TaskRead]
+    total: int
+    limit: int
+    offset: int
