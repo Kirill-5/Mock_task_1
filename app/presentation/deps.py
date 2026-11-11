@@ -10,6 +10,7 @@ from app.application.use_cases import (
     DeleteProjectUseCase,
     GetProjectUseCase,
     GetTaskUseCase,
+    ListProjectTasksUseCase,
     UpdateTaskUseCase,
 )
 
@@ -49,3 +50,9 @@ def get_change_task_status_use_case(
     uow_factory: UowFactoryDep,
 ) -> ChangeTaskStatusUseCase:
     return ChangeTaskStatusUseCase(uow_factory)
+
+
+def get_list_project_tasks_use_case(
+    uow_factory: UowFactoryDep,
+) -> ListProjectTasksUseCase:
+    return ListProjectTasksUseCase(uow_factory)

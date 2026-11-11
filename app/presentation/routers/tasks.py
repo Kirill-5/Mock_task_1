@@ -1,22 +1,37 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.application.commands import ChangeTaskStatus, CreateTask, GetTask, UpdateTask
+from app.application.commands import (
+    ChangeTaskStatus,
+    CreateTask,
+    GetTask,
+    ListProjectTasks,
+    UpdateTask,
+)
 from app.application.use_cases import (
     ChangeTaskStatusUseCase,
     CreateTaskUseCase,
     GetTaskUseCase,
+    ListProjectTasksUseCase,
     UpdateTaskUseCase,
 )
+from app.domain.entities import TaskPriority, TaskStatus
 from app.presentation.deps import (
     get_change_task_status_use_case,
     get_create_task_use_case,
     get_get_task_use_case,
+    get_list_project_tasks_use_case,
     get_update_task_use_case,
 )
-from app.presentation.schemas import TaskCreate, TaskRead, TaskStatusChange, TaskUpdate
+from app.presentation.schemas import (
+    TaskCreate,
+    TaskPageRead,
+    TaskRead,
+    TaskStatusChange,
+    TaskUpdate,
+)
 
 router = APIRouter(tags=["tasks"])
 
@@ -35,6 +50,29 @@ async def create_task(
         CreateTask(project_id=project_id, title=body.title, priority=body.priority)
     )
     return TaskRead.model_validate(task)
+
+
+@router.get("/projects/{project_id}/tasks", response_model=TaskPageRead)
+async def list_project_tasks(
+    project_id: uuid.UUID,
+    use_case: Annotated[
+        ListProjectTasksUseCase, Depends(get_list_project_tasks_use_case)
+    ],
+    task_status: Annotated[TaskStatus | None, Query(alias="status")] = None,
+    priority: TaskPriority | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> TaskPageRead:
+    page = await use_case.execute(
+        ListProjectTasks(
+            project_id=project_id,
+            status=task_status,
+            priority=priority,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    return TaskPageRead.model_validate(page)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskRead)

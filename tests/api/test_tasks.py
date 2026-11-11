@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -455,5 +455,219 @@ async def test_change_status_rejects_invalid_value(
     client: AsyncClient, task: dict[str, Any], body: dict[str, Any]
 ) -> None:
     response = await client.post(f"/tasks/{task['id']}/status", json=body)
+
+    assert response.status_code == 422
+
+
+async def set_created_at(
+    session_factory: SessionFactory, task_id: str, created_at: datetime
+) -> None:
+    async with session_factory() as session:
+        await session.execute(
+            update(TaskModel)
+            .where(TaskModel.id == uuid.UUID(task_id))
+            .values(created_at=created_at)
+        )
+        await session.commit()
+
+
+async def list_tasks(
+    client: AsyncClient, project_id: str, **params: Any
+) -> dict[str, Any]:
+    response = await client.get(f"/projects/{project_id}/tasks", params=params)
+    assert response.status_code == 200
+    return response.json()
+
+
+def titles(page: dict[str, Any]) -> list[str]:
+    return [item["title"] for item in page["items"]]
+
+
+async def create_dated_tasks(
+    client: AsyncClient,
+    session_factory: SessionFactory,
+    project_id: str,
+    names: list[str],
+) -> None:
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    for minutes, name in enumerate(names):
+        created = await create_task(client, project_id, name)
+        await set_created_at(
+            session_factory, created["id"], base + timedelta(minutes=minutes)
+        )
+
+
+async def test_list_project_tasks(client: AsyncClient) -> None:
+    project_a = await create_project(client, "Alpha")
+    project_b = await create_project(client, "Beta")
+    created = [
+        await create_task(client, project_a, name)
+        for name in ("Write spec", "Write tests", "Review spec")
+    ]
+    await create_task(client, project_b, "Foreign task")
+
+    page = await list_tasks(client, project_a)
+
+    assert page["total"] == 3
+    assert page["limit"] == 20
+    assert page["offset"] == 0
+    by_id = {item["id"]: item for item in page["items"]}
+    assert by_id == {task["id"]: task for task in created}
+
+
+async def test_list_tasks_of_empty_project(
+    client: AsyncClient, project_id: str
+) -> None:
+    page = await list_tasks(client, project_id)
+
+    assert page == {"items": [], "total": 0, "limit": 20, "offset": 0}
+
+
+async def test_list_tasks_newest_first(
+    client: AsyncClient, session_factory: SessionFactory, project_id: str
+) -> None:
+    await create_dated_tasks(
+        client, session_factory, project_id, ["First", "Second", "Third"]
+    )
+
+    page = await list_tasks(client, project_id)
+
+    assert titles(page) == ["Third", "Second", "First"]
+
+
+async def test_list_tasks_order_is_stable_for_equal_created_at(
+    client: AsyncClient, session_factory: SessionFactory, project_id: str
+) -> None:
+    same_time = datetime(2026, 1, 1, tzinfo=UTC)
+    names = [f"Task {number}" for number in range(5)]
+    for name in names:
+        created = await create_task(client, project_id, name)
+        await set_created_at(session_factory, created["id"], same_time)
+
+    pages = [
+        titles(await list_tasks(client, project_id, limit=2, offset=offset))
+        for offset in (0, 2, 4)
+    ]
+    repeated = [
+        titles(await list_tasks(client, project_id, limit=2, offset=offset))
+        for offset in (0, 2, 4)
+    ]
+
+    assert sorted(name for page in pages for name in page) == sorted(names)
+    assert repeated == pages
+
+
+async def test_list_tasks_filtered_by_status(
+    client: AsyncClient, project_id: str, insert_task: InsertTask
+) -> None:
+    project = uuid.UUID(project_id)
+    await insert_task(project, "Todo task", TaskStatus.TO_DO)
+    await insert_task(project, "Active task", TaskStatus.IN_PROGRESS)
+    await insert_task(project, "Other active", TaskStatus.IN_PROGRESS)
+    await insert_task(project, "Done task", TaskStatus.DONE)
+
+    page = await list_tasks(client, project_id, status="in_progress")
+
+    assert sorted(titles(page)) == ["Active task", "Other active"]
+    assert {item["status"] for item in page["items"]} == {"in_progress"}
+    assert page["total"] == 2
+
+
+async def test_list_tasks_filtered_by_priority(
+    client: AsyncClient, project_id: str
+) -> None:
+    await create_task(client, project_id, "Low task", priority="low")
+    await create_task(client, project_id, "Medium task", priority="medium")
+    await create_task(client, project_id, "High task", priority="high")
+
+    page = await list_tasks(client, project_id, priority="high")
+
+    assert titles(page) == ["High task"]
+    assert page["items"][0]["priority"] == "high"
+    assert page["total"] == 1
+
+
+async def test_list_tasks_filtered_by_status_and_priority(
+    client: AsyncClient, project_id: str
+) -> None:
+    await create_task(client, project_id, "High todo", priority="high")
+    active = await create_task(client, project_id, "High active", priority="high")
+    await client.post(f"/tasks/{active['id']}/status", json={"status": "in_progress"})
+    await create_task(client, project_id, "Low todo", priority="low")
+
+    page = await list_tasks(client, project_id, status="todo", priority="high")
+
+    assert titles(page) == ["High todo"]
+    assert page["total"] == 1
+
+
+@pytest.mark.parametrize("params", [{"status": "archived"}, {"priority": "urgent"}])
+async def test_list_tasks_with_invalid_filter(
+    client: AsyncClient, project_id: str, params: dict[str, str]
+) -> None:
+    response = await client.get(f"/projects/{project_id}/tasks", params=params)
+
+    assert response.status_code == 422
+
+
+async def test_list_tasks_page(
+    client: AsyncClient, session_factory: SessionFactory, project_id: str
+) -> None:
+    await create_dated_tasks(
+        client, session_factory, project_id, ["One", "Two", "Three", "Four", "Five"]
+    )
+
+    page = await list_tasks(client, project_id, limit=2, offset=2)
+
+    assert titles(page) == ["Three", "Two"]
+    assert page["total"] == 5
+    assert page["limit"] == 2
+    assert page["offset"] == 2
+
+
+async def test_list_tasks_offset_beyond_end(
+    client: AsyncClient, project_id: str
+) -> None:
+    for name in ("Write spec", "Write tests", "Review spec"):
+        await create_task(client, project_id, name)
+
+    page = await list_tasks(client, project_id, offset=10)
+
+    assert page["items"] == []
+    assert page["total"] == 3
+
+
+@pytest.mark.parametrize("limit", [1, 100])
+async def test_list_tasks_limit_boundaries(
+    client: AsyncClient, project_id: str, limit: int
+) -> None:
+    await create_task(client, project_id)
+
+    page = await list_tasks(client, project_id, limit=limit)
+
+    assert page["limit"] == limit
+    assert len(page["items"]) == 1
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"limit": 0}, {"limit": 101}, {"limit": "abc"}, {"offset": -1}],
+)
+async def test_list_tasks_with_invalid_pagination(
+    client: AsyncClient, project_id: str, params: dict[str, Any]
+) -> None:
+    response = await client.get(f"/projects/{project_id}/tasks", params=params)
+
+    assert response.status_code == 422
+
+
+async def test_list_tasks_of_unknown_project(client: AsyncClient) -> None:
+    response = await client.get(f"/projects/{uuid.uuid4()}/tasks")
+
+    assert response.status_code == 404
+
+
+async def test_list_tasks_with_invalid_project_id(client: AsyncClient) -> None:
+    response = await client.get("/projects/not-a-uuid/tasks")
 
     assert response.status_code == 422
