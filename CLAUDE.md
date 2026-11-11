@@ -12,6 +12,9 @@ Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Alembic, Pydantic v2, 
 - Линтер и форматирование: `ruff check .` / `ruff format .`
 - Применить миграции: `alembic upgrade head`
 - Новая миграция: `alembic revision --autogenerate -m "<описание>"`
+- MCP-сервер по stdio: `uv run python -m app.presentation.mcp_server` (нужна запущенная БД)
+- Подключить MCP-сервер к Claude Code: `claude mcp add projects-and-tasks -- uv run python -m app.presentation.mcp_server`
+- На Windows `uv run pytest` / `uv run alembic` могут падать с `uv trampoline failed`; тогда `uv run python -m pytest` / `uv run python -m alembic`
 
 ## Архитектура
 Зависимости направлены только внутрь: `presentation → application → domain`, `infrastructure → application → domain`.
@@ -28,7 +31,9 @@ Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Alembic, Pydantic v2, 
   - `db/models.py`: ORM-модели с `from_domain()` / `to_domain()`.
   - `db/repository.py`: репозитории делают `flush()`, но никогда `commit()`.
   - `uow.py`: `SqlAlchemyUnitOfWork`. Use case коммитит явно, `__aexit__` всегда откатывает незакоммиченное.
-- `app/presentation/`: схемы Pydantic, зависимости FastAPI (`deps.py`), роутеры.
+- `app/presentation/`: два адаптера поверх одних и тех же use cases.
+  - REST: схемы Pydantic, зависимости FastAPI (`deps.py`), роутеры.
+  - MCP: `mcp_server.py` на FastMCP — инструменты для проектов и задач и ресурс `project://{id}`. Доменные ошибки уходят клиенту как `ToolError("<not_found|conflict|validation>: ...")`.
 - `app/main.py`: сборка приложения и маппинг доменных ошибок в HTTP-коды.
 
 ## Соглашения
